@@ -1455,11 +1455,24 @@ internal class ClientCommands(handler: CommandHandler) {
                 player.sendSystemMessage(player.i18NBundle.getinput("battleRoom.transitionInProgress"))
                 return false
             }
+            // Host/admin may return to the battle room at any time, including while the room
+            // is still in post-game settlement with automatic resumption disabled
+            // (lobby.autoResumeAfterGameOver=false). In that case the manual .battleroom is the
+            // intended escape hatch, so allow the transition to run during settlement. Only
+            // privileged callers reach this point (the permission check above gates it).
+            val allowDuringSettlement = StartModeGameOverReturnSupport.isSettling()
             var transitionCallError: Throwable? = null
             val transitionScheduled = runCatching {
                 gameModule.gameLinkFunction.battleRoom(
                         time = MANUAL_BATTLE_ROOM_RETURN_SECONDS,
+                        allowDuringSettlement = allowDuringSettlement,
                         onCompleted = {
+                            if (allowDuringSettlement) {
+                                // Mirrors the auto path: a during-settlement return is the caller's
+                                // responsibility to unwind the lifecycle so the room returns to a
+                                // clean LOBBY and can start a new game.
+                                StartModeGameOverReturnSupport.onRoomResetComplete("manual_battle_room_return_settled")
+                            }
                             runCatching {
                                 player.sendSystemMessage(player.i18NBundle.getinput("battleRoom.returnCompleted"))
                             }

@@ -87,6 +87,24 @@ internal class BeanServerConfigFileTest {
         assertEquals(false, startMode.enableGameOverBattleRoomReturn)
         assertEquals(30, startMode.gameOverReturnCountdownSeconds)
         assertEquals(true, startMode.pruneDisconnectedPlayersOnGameOver)
+        assertEquals(true, startMode.autoResumeAfterGameOver)
+    }
+
+    @Test
+    fun startModeAutoResumeIsExplicitlyDisabledOnlyWhenFalse() {
+        val missing = BeanServerConfigFile(
+            lobby = BeanServerConfigFile.LobbySection(autoResumeAfterGameOver = null)
+        ).toStartModeConfig()
+        val disabled = BeanServerConfigFile(
+            lobby = BeanServerConfigFile.LobbySection(autoResumeAfterGameOver = false)
+        ).toStartModeConfig()
+        val enabled = BeanServerConfigFile(
+            lobby = BeanServerConfigFile.LobbySection(autoResumeAfterGameOver = true)
+        ).toStartModeConfig()
+
+        assertEquals(true, missing.autoResumeAfterGameOver)
+        assertEquals(false, disabled.autoResumeAfterGameOver)
+        assertEquals(true, enabled.autoResumeAfterGameOver)
     }
 
     @Test

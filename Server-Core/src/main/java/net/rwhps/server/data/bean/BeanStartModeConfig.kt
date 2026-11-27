@@ -54,6 +54,12 @@ data class BeanStartModeConfig(
     val enableGameOverBattleRoomReturn: Boolean = false,
     /** Wait before the configured post-game battle-room return or forced server reset. */
     val gameOverReturnCountdownSeconds: Int = 30,
+    /**
+     * When false, the server still detects game over but performs no automatic post-game
+     * countdown, forced reset, battle-room return, stale-lifecycle recovery or auto-start.
+     * Manual channels (console `gameover`, `.battleroom`, votes) remain available.
+     */
+    val autoResumeAfterGameOver: Boolean = true,
     /** Remove players that are still disconnected when the post-game return starts. */
     val pruneDisconnectedPlayersOnGameOver: Boolean = true,
     /** Send a concise readiness summary when a player joins the lobby. */

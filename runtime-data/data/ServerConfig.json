@@ -94,6 +94,7 @@
     "reconnectGraceMillis": 5000,
     "enableGameOverBattleRoomReturn": false,
     "gameOverReturnCountdownSeconds": 30,
+    "autoResumeAfterGameOver": true,
     "pruneDisconnectedPlayersOnGameOver": true,
     "enableJoinReadinessTips": false,
     "joinTipModWarningThreshold": 1,

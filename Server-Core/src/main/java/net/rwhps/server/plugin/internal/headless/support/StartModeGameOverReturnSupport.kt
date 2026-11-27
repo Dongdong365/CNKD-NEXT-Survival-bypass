@@ -105,22 +105,44 @@ internal object StartModeGameOverReturnSupport {
     fun onSettle(module: AbstractGameModule, label: String) {
         val settlePolicy = gameOverSettlePolicy()
         val settleSeconds = settlePolicy.countdownSeconds
+        val autoResume = autoResumeEnabled()
         val settleGenerationId = synchronized(lifecycleLock) {
             if (currentState != GameState.PLAYING) return
 
-            currentState = GameState.SETTLING
-            lastSettleReason = label
-            lastSettleSeconds = settleSeconds
-            lastSettleMode = settlePolicy.mode.diagnosticValue
-            lastSettleAtMillis = System.currentTimeMillis()
-            lastBattleRoomTransitionStatus = if (settlePolicy.mode.usesBattleRoomTransition) "pending" else "not_requested"
-            lastBattleRoomTransitionError = "none"
-            activeSettleForcesServerReset = !settlePolicy.mode.usesBattleRoomTransition
-            activeResetRetryAttempts = 0
-            activeResetRetryExhausted = false
-            resetRetryExhaustedAtMillis = 0L
-            staleLifecycleRecoveryInFlight = false
-            lifecycleGeneration.incrementAndGet()
+            if (!autoResume) {
+                // Game over is recognized and recorded (state, counters, diagnostics below),
+                // but no automatic settle countdown, forced reset or battle-room transition
+                // is scheduled. The room stays in SETTLING until a manual action
+                // (console `gameover`, `.battleroom`, vote) or process restart.
+                currentState = GameState.SETTLING
+                lastSettleReason = label
+                lastSettleSeconds = 0
+                lastSettleMode = "auto_resume_disabled"
+                lastSettleAtMillis = System.currentTimeMillis()
+                lastBattleRoomTransitionStatus = "not_requested"
+                lastBattleRoomTransitionError = "none"
+                activeSettleForcesServerReset = false
+                activeResetRetryAttempts = 0
+                activeResetRetryExhausted = false
+                resetRetryExhaustedAtMillis = 0L
+                staleLifecycleRecoveryInFlight = false
+                lifecycleGeneration.incrementAndGet()
+                settlingCount.incrementAndGet()
+            } else {
+                currentState = GameState.SETTLING
+                lastSettleReason = label
+                lastSettleSeconds = settleSeconds
+                lastSettleMode = settlePolicy.mode.diagnosticValue
+                lastSettleAtMillis = System.currentTimeMillis()
+                lastBattleRoomTransitionStatus = if (settlePolicy.mode.usesBattleRoomTransition) "pending" else "not_requested"
+                lastBattleRoomTransitionError = "none"
+                activeSettleForcesServerReset = !settlePolicy.mode.usesBattleRoomTransition
+                activeResetRetryAttempts = 0
+                activeResetRetryExhausted = false
+                resetRetryExhaustedAtMillis = 0L
+                staleLifecycleRecoveryInFlight = false
+                lifecycleGeneration.incrementAndGet()
+            }
         }
         closeResetRetryTask("settle:$label")
         module.gameFunction.suspendMainThreadOperations {
@@ -128,6 +150,17 @@ internal object StartModeGameOverReturnSupport {
         }
         closeSettleTask("settle:$label")
         clearNoOnlineHumanGrace("settle:$label")
+
+        if (!autoResume) {
+            StartModeConsoleOutputSupport.printThrottled(
+                StartModeConsoleOutputSupport.Category.LIFECYCLE_RECOVERY,
+                "auto_resume_disabled_settle",
+                "[${module.room.roomID}] Game over detected; automatic resumption disabled " +
+                        "(lobby.autoResumeAfterGameOver=false), no reset or battle-room return will run: reason=$label",
+                minIntervalMillis = 60_000L
+            )
+            return
+        }
 
         val room = module.room
         settlingCount.incrementAndGet()
@@ -214,9 +247,19 @@ internal object StartModeGameOverReturnSupport {
     fun isSettling(): Boolean = currentState == GameState.SETTLING
     fun isPlaying(): Boolean = currentState == GameState.PLAYING
     fun configuredSettleSeconds(): Int = gameOverSettlePolicy().countdownSeconds
+
+    /**
+     * Whether post-game automatic resumption is enabled. When disabled the server still
+     * detects game over (state/diagnostics), but performs no automatic countdown, forced
+     * reset, battle-room return, stale-lifecycle recovery or auto-start.
+     */
+    fun autoResumeEnabled(): Boolean {
+        return runCatching { Data.configStartMode.autoResumeAfterGameOver }.getOrDefault(true)
+    }
+
     fun postGameSettleSeconds(): Int = if (isSettling()) lastSettleSeconds else configuredSettleSeconds()
     fun recommendedSettleRecheckSeconds(): Int = postGameSettleSeconds() + STALE_SETTLING_RECOVERY_GRACE_SECONDS
-    fun shouldSkipPostGameAutoStart(): Boolean = isSettling() && activeSettleForcesServerReset
+    fun shouldSkipPostGameAutoStart(): Boolean = isSettling() && (activeSettleForcesServerReset || !autoResumeEnabled())
 
     /**
      * Returns true when the caller should stop the current action because room
@@ -240,6 +283,12 @@ internal object StartModeGameOverReturnSupport {
         }
 
         if (state == GameState.SETTLING && !room.isGameOverResetInProgress()) {
+            if (!autoResumeEnabled()) {
+                // Automatic resumption is disabled: the room stays settled after game over
+                // and no stale-settling recycle is requested. A manual action (console
+                // `gameover`, vote) or a process restart is the escape hatch.
+                return true
+            }
             if (shouldBlockStaleSettlingRecovery(
                     resetRetryExhausted = activeResetRetryExhausted,
                     resetRetryExhaustedAtMillis = resetRetryExhaustedAtMillis,
@@ -414,6 +463,7 @@ internal object StartModeGameOverReturnSupport {
         val settlePolicy = gameOverSettlePolicy()
         return listOf(
             "gameOver.state=${currentState.name}",
+            "gameOver.autoResumeEnabled=${autoResumeEnabled()}",
             "gameOver.settleSeconds=${settlePolicy.countdownSeconds}",
             "gameOver.defaultSettleSeconds=$SETTLE_SECONDS",
             "gameOver.lifecycleGeneration=${lifecycleGeneration.get()}",

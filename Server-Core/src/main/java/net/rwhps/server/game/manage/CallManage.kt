@@ -146,6 +146,9 @@ class CallManage(private val gameModule: AbstractGameModule) {
                 if (now - noOnlineHumanSince < NO_ONLINE_HUMAN_RESET_GRACE_SECONDS) {
                     return@newTimedTask
                 }
+                if (!StartModeGameOverReturnSupport.autoResumeEnabled()) {
+                    return@newTimedTask
+                }
                 Log.clog("[${gameModule.room.roomID}] No online human players remain in game after grace. Triggering gameover reset.")
                 noOnlineHumanSince = 0
                 StartModeGameOverReturnSupport.recordNoOnlineHumanGraceExpired("auto_check_expired")
@@ -177,6 +180,9 @@ class CallManage(private val gameModule: AbstractGameModule) {
                     if (aiEndTime == 0) {
                         aiEndTime = Time.concurrentSecond() + Data.configServer.maxOnlyAIGameIngTime
                     } else if (Data.configServer.maxOnlyAIGameIngTime != -1 && Time.concurrentSecond() > aiEndTime) {
+                        if (!StartModeGameOverReturnSupport.autoResumeEnabled()) {
+                            return@newTimedTask
+                        }
                         gameModule.room.gr()
                         return@newTimedTask
                     }
@@ -187,8 +193,9 @@ class CallManage(private val gameModule: AbstractGameModule) {
                 if (isWithinStartPlayerCountGrace()) {
                     return@newTimedTask
                 }
+                val autoResumeEnabled = StartModeGameOverReturnSupport.autoResumeEnabled()
                 when (protectedHumanCount) {
-                    0 -> gameModule.room.gr()
+                    0 -> if (autoResumeEnabled) gameModule.room.gr()
                     1 -> StartModeGameOverReturnSupport.onSettle(gameModule, "one_player_left")
                     else -> { /* enough players, keep playing */ }
                 }

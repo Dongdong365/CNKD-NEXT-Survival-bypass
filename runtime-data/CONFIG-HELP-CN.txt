@@ -410,6 +410,13 @@ gameOverReturnCountdownSeconds
 - 作用：自动返回战役室或服务器强制重置前共用的赛后等待秒数，范围 5-300。
 - 建议：保持 30 秒，让玩家看完结算并确认接下来是自动返回还是重新进房。
 
+autoResumeAfterGameOver
+- 默认值：true；字段缺失也按 true 处理。
+- true：正常行为，检测到游戏结束后按上述开关执行自动返回战役室或强制重置，并允许自动开局。
+- false：服务器能检测到游戏结束，但什么都不做：不倒计时、不重置、不自动返回战役室、不自动开局，房间停留在结算状态。
+- 关闭时仍可通过控制台 gameover、投票，或房主/管理员执行 .battleroom 手动恢复（.battleroom 在结算态同样可用，返回后房间复位回大厅，可重新开局），或重启实例。
+- 说明：关闭后 startmode bootcheck 的 gameOver.autoResumeEnabled 会显示 false；开关按次读取，稳定大厅执行 reloadconfig 后可即时切换。
+
 pruneDisconnectedPlayersOnGameOver
 - 默认值：true。
 - 作用：返回战役室前自动清理已经掉线但仍占用对局位置的玩家，避免下一局出现幽灵占位。

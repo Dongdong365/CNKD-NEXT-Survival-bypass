@@ -257,6 +257,9 @@ object ConfigCheckSupport {
         if (lobby.enableGameOverBattleRoomReturn != true) {
             tips += "lobby.enableGameOverBattleRoomReturn 未显式开启；赛后将提示强制重置，不会自动返回战役室，重置后玩家需要重新进入"
         }
+        if (lobby.autoResumeAfterGameOver == false) {
+            tips += "lobby.autoResumeAfterGameOver=false；检测到游戏结束后服务器不会自动重置/返回/自动开局，房间停在结算状态，需手动执行控制台 gameover 或 .battleroom（管理员）"
+        }
         if (gameOverReturnCountdown !in 5..300) {
             warnings += "lobby.gameOverReturnCountdownSeconds 建议保持 5-300，当前=$gameOverReturnCountdown"
         } else if (gameOverReturnCountdown < 15) {
