@@ -13,7 +13,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-        
     steps:
       - uses: actions/checkout@v4
 
@@ -26,26 +25,38 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
         with:
           cache-read-only: false
+          gradle-home-cache-cleanup: true # 自动清理缓存无用文件
 
-      - name: Change wrapper permissions
+      - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
-      - name: Run build with Gradle Wrapper
-        run: ./gradlew build
+      - name: Compile & Assemble (skip unit test, only build jars)
+        run: ./gradlew assemble
 
-      - name: List all jars
-        run: ls -la Server-All\build\libs
+      - name: Debug - print project directory structure
+        run: tree -L 3
 
-      - name: Select largest jar（shadow打包的fat包）
+      - name: List Server‑All build libs
+        run: ls -la Server-All/build/libs
+
+      - name: Select largest shadow fat‑jar (stable find implementation)
         id: jarfile
         run: |
-          # 按文件大小排序，取最大的那个jar（shadow胖包体积远大于普通jar）
-          JAR_FILE=$(ls -S build/libs/*.jar | head -1)
-          echo "jar=${JAR_FILE}" >> $GITHUB_OUTPUT
-          echo "Selected jar: ${JAR_FILE}"
+          JAR_DIR="Server-All/build/libs"
+          # find: 获取文件大小 + 文件路径，按大小降序，取第一条
+          JAR_FILE=$(find "${JAR_DIR}" -maxdepth 1 -type f -name "*.jar" -printf "%s %p\n" | sort -nr | head -n1 | cut -d' ' -f2-)
+          
+          if [[ -z "${JAR_FILE}" || ! -f "${JAR_FILE}" ]]; then
+            echo "ERROR: Can NOT find any jar file in ${JAR_DIR}"
+            exit 1
+          fi
 
-      - name: Upload JAR directly (no zip)
+          echo "jar=${JAR_FILE}" >> $GITHUB_OUTPUT
+          echo "Selected fat jar -> ${JAR_FILE}"
+
+      - name: Upload built fat‑jar artifact (raw file, no zip)
         uses: actions/upload-artifact@v7
         with:
           path: ${{ steps.jarfile.outputs.jar }}
           archive: false
+          retention-days: 30 # 制品保存30天，按需调整
