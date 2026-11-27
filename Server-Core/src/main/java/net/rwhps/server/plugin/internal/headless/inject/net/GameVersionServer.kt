@@ -425,11 +425,15 @@ open class GameVersionServer(val playerConnectX: PlayerConnectX): AbstractNetCon
                 room,
                 "game_command:${player.name}"
             )
+            val autoResumeEnabled = StartModeGameOverReturnSupport.autoResumeEnabled()
             val lifecycleBlockReason = when {
                 room.isBattleRoomTransitionCommitBlocking() -> "battle_room_transition_committing"
-                lifecycleRecoveryDeferred -> "lifecycle_recovery_deferred"
+                // With automatic resumption disabled the settled room is not frozen: human
+                // players keep issuing game commands (the engine AI simulation continues too),
+                // so .battleroom / gameover remain fully usable as the manual escape hatch.
+                lifecycleRecoveryDeferred && autoResumeEnabled -> "lifecycle_recovery_deferred"
                 room.isGameOverResetInProgress() -> "room_resetting"
-                StartModeGameOverReturnSupport.isSettling() -> "game_settling"
+                StartModeGameOverReturnSupport.isSettling() && autoResumeEnabled -> "game_settling"
                 else -> null
             }
             if (lifecycleBlockReason != null) {
@@ -684,7 +688,7 @@ open class GameVersionServer(val playerConnectX: PlayerConnectX): AbstractNetCon
         if (room.isGameOverResetInProgress()) {
             return GameCommandFastPathGuard("room_resetting", hardReject = true)
         }
-        if (StartModeGameOverReturnSupport.isSettling()) {
+        if (StartModeGameOverReturnSupport.isSettling() && StartModeGameOverReturnSupport.autoResumeEnabled()) {
             return GameCommandFastPathGuard("game_settling", hardReject = true)
         }
         if (!room.isStartGame) {

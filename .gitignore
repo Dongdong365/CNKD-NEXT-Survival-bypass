@@ -41,6 +41,3 @@ runtime-data/data/plugins/data/
 Thumbs.db
 desktop.ini
 .DS_Store
-
-# Local game engine and third-party binaries
-/Server-Core/libs/*.jar
