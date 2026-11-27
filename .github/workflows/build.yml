@@ -1,57 +1,51 @@
 name: build
 on:
-workflow_dispatch:
-push:
-paths-ignore:
+  workflow_dispatch:
+  push:
+    paths-ignore:
+      - '.github/**'
+      - '*.md'
+  pull_request:
+    paths-ignore:
+      - '.github/**'
+      - '*.md'
 
-
-'.github/**'
-
-'*.md'
-pull_request:
-paths-ignore:
-
-'.github/**'
-
-'*.md'
 jobs:
-build:
-runs-on: ubuntu-latest
+  build:
+    runs-on: ubuntu-latest
+        
+    steps:
+      - uses: actions/checkout@v4
 
-steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-read-only: false
 
-uses: actions/checkout@v4
+      - name: Change wrapper permissions
+        run: chmod +x ./gradlew
 
-uses: actions/setup-java@v4
-with:
-distribution: temurin
-java-version: 21
+      - name: Run build with Gradle Wrapper
+        run: ./gradlew build
 
-name: Setup Gradle
-uses: gradle/actions/setup-gradle@v3
-with:
-cache-read-only: false
+      - name: List all jars
+        run: ls -la Server-All\build\libs
 
-name: Change wrapper permissions
-run: chmod +x ./gradlew
+      - name: Select largest jar（shadow打包的fat包）
+        id: jarfile
+        run: |
+          # 按文件大小排序，取最大的那个jar（shadow胖包体积远大于普通jar）
+          JAR_FILE=$(ls -S build/libs/*.jar | head -1)
+          echo "jar=${JAR_FILE}" >> $GITHUB_OUTPUT
+          echo "Selected jar: ${JAR_FILE}"
 
-name: Run build with Gradle Wrapper
-run: ./gradlew build
-
-name: List all jars
-run: ls -la Server-All\build\libs
-
-name: Select largest jar（shadow打包的fat包）
-id: jarfile
-run: |
-按文件大小排序，取最大的那个jar（shadow胖包体积远大于普通jar）
-JAR_FILE=$(ls -S build/libs/*.jar | head -1)
-echo "jar=${JAR_FILE}" >> $GITHUB_OUTPUT
-echo "Selected jar: ${JAR_FILE}"
-
-name: Upload JAR directly (no zip)
-uses: actions/upload-artifact@v7
-with:
-path: ${{ steps.jarfile.outputs.jar }}
-archive: false
+      - name: Upload JAR directly (no zip)
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ steps.jarfile.outputs.jar }}
+          archive: false
