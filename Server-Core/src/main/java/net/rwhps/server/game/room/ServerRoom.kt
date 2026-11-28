@@ -64,6 +64,10 @@ class ServerRoom(
 
     @Volatile var isStartGame = false
 
+    @Volatile
+    internal var startingSurvivalHumans: SurvivalHumanRoster? = null
+        private set
+
     // Start Time
     var startTime = 0
         private set
@@ -150,6 +154,12 @@ class ServerRoom(
                 closeBattleRoomTransitionTasks()
                 flagData = ServerCacheFlag()
                 closeTimeTask(CallTimeTask.GameOverTask)
+                // Remember the actual starting alliance. Losing a connection must not
+                // turn an opposing alliance into a cooperative survival participant.
+                startingSurvivalHumans = SurvivalHumanRoster.capture(
+                    playerManage.playerGroup.filter { playerManage.isConnectedHumanPlayer(it) }
+                        .map { it.index to it.team }
+                )
                 isStartGame = true
                 StartModeGameOverReturnSupport.onGameStart()
                 StartModeDefeatedPlayerKickSupport.onGameStart()
@@ -921,6 +931,7 @@ class ServerRoom(
     ) {
         net.rwhps.server.analytics.StatisticsBridge.finish(gameModule, "ROOM_RESET")
         isStartGame = false
+        startingSurvivalHumans = null
         synchronized(this) {
             lobbyLifecycleGeneration++
         }

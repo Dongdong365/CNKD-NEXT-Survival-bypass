@@ -8,6 +8,7 @@
 package net.rwhps.server.plugin.internal.headless.support
 
 import com.corrodinggames.rts.game.n
+import com.corrodinggames.rts.gameFramework.l as GameCore
 import net.rwhps.server.data.global.Data
 import net.rwhps.server.game.event.game.ServerGameOverEvent.GameOverData
 import net.rwhps.server.game.manage.HeadlessModuleManage
@@ -219,7 +220,7 @@ internal object StartModeSurvivalSupport {
         StartModeSurvivalRuntimeGuardSupport.schedule(
             room = room,
             generation = generation,
-            repairEngineLocalPlayerFast = ::repairEngineLocalPlayerFast,
+            repairEngineLocalPlayerFast = { layout -> repairEngineLocalPlayerFast(layout, room) },
             repairRuntimeSurvivalState = ::repairRuntimeSurvivalState,
             recordRuntimeSnapshot = ::recordRuntimeSnapshot,
             logSurvivalRepair = ::logSurvivalRepair
@@ -388,21 +389,23 @@ internal object StartModeSurvivalSupport {
             val engine = StartModeSurvivalMissionAccessSupport.gameEngineOrNull()
                 ?: return@runCatching StartModeSurvivalControlledPlayerState(error = "game_engine_not_ready")
             val before = engine.bs
-            val candidates = layout.humanSlots
-                .mapNotNull { slot -> n.k(slot.playerIndex) }
-                .filter { candidate -> candidate.k !in layout.reservedPlayerIndexes }
-            val onlineHumanIndexes = room?.playerManage?.playerGroup
-                ?.filter { !it.isAi }
-                ?.map { it.index }
-                ?.toSet()
-                .orEmpty()
-            val preferred = candidates.firstOrNull { StartModeSurvivalRuntimeQuerySupport.countMainBuildingsForPlayer(it) > 0 }
-                ?: candidates.firstOrNull { it.k in onlineHumanIndexes }
-                ?: candidates.firstOrNull()
-            if (preferred != null && engine.bs !== preferred) {
-                engine.bs = preferred
-                engineLocalPlayerRepairs.incrementAndGet()
-                logSurvivalRepair("[StartMode] Survival local player repaired: ${before?.k ?: "null"} -> ${preferred.k}")
+            if (!usesNativeCooperativeBinding(engine, room)) {
+                val candidates = layout.humanSlots
+                    .mapNotNull { slot -> n.k(slot.playerIndex) }
+                    .filter { candidate -> candidate.k !in layout.reservedPlayerIndexes }
+                val onlineHumanIndexes = room?.playerManage?.playerGroup
+                    ?.filter { !it.isAi }
+                    ?.map { it.index }
+                    ?.toSet()
+                    .orEmpty()
+                val preferred = candidates.firstOrNull { StartModeSurvivalRuntimeQuerySupport.countMainBuildingsForPlayer(it) > 0 }
+                    ?: candidates.firstOrNull { it.k in onlineHumanIndexes }
+                    ?: candidates.firstOrNull()
+                if (preferred != null && engine.bs !== preferred) {
+                    engine.bs = preferred
+                    engineLocalPlayerRepairs.incrementAndGet()
+                    logSurvivalRepair("[StartMode] Survival local player repaired: ${before?.k ?: "null"} -> ${preferred.k}")
+                }
             }
 
             val controlled = engine.bs
@@ -440,18 +443,28 @@ internal object StartModeSurvivalSupport {
         }
     }
 
-    private fun repairEngineLocalPlayerFast(layout: StartModeSurvivalMapSupport.SurvivalLayout) {
+    private fun usesNativeCooperativeBinding(engine: GameCore, room: ServerRoom?): Boolean {
+        if (engine.ce?.k != true) return false
+        val net = engine.bX ?: return false
+        if (!net.B || !net.C || !net.aW || net.z !== n.i) return false
+        val activeRoom = room ?: HeadlessModuleManage.hps.room
+        return activeRoom.isStartGame && activeRoom.startingSurvivalHumans != null
+    }
+
+    private fun repairEngineLocalPlayerFast(layout: StartModeSurvivalMapSupport.SurvivalLayout, room: ServerRoom) {
         runEngineMutation("repair_survival_local_player") {
-            repairEngineLocalPlayerFastOnGameThread(layout)
+            repairEngineLocalPlayerFastOnGameThread(layout, room)
         }
     }
 
-    private fun repairEngineLocalPlayerFastOnGameThread(layout: StartModeSurvivalMapSupport.SurvivalLayout) {
+    private fun repairEngineLocalPlayerFastOnGameThread(layout: StartModeSurvivalMapSupport.SurvivalLayout, room: ServerRoom) {
         runCatching {
+            val engine = StartModeSurvivalMissionAccessSupport.gameEngineOrNull() ?: return@runCatching
+            // The native mission hook manages the live ally binding; don't reset it to the primary slot.
+            if (usesNativeCooperativeBinding(engine, room)) return@runCatching
             val preferred = n.k(layout.primaryHumanSlot.playerIndex)
                 ?: layout.humanSlots.asSequence().mapNotNull { n.k(it.playerIndex) }.firstOrNull()
                 ?: return
-            val engine = StartModeSurvivalMissionAccessSupport.gameEngineOrNull() ?: return@runCatching
             if (engine.bs !== preferred) {
                 val before = engine.bs
                 engine.bs = preferred

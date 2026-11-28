@@ -38,9 +38,8 @@ class ValueLinkRedirections: MainRedirections {
         @GameSimulationLayer.GameSimulationLayer_KeyWords("Returning to battleroom in")
         redirectL(MethodTypeInfoValue("com/corrodinggames/rts/gameFramework/j/ad", "a", "(F)V", true, CompatibleThreadUnsafeArrayList::class.java))
 
-        // Headless survival checks consume l.bs, which the network save loader resets to the
-        // hidden host (ad.z). Fix it on successful resync, and before the first mission tick
-        // so a false defeat cannot be included in the snapshot in the first place.
+        // Repair the headless local reference after resync. Before a native survival
+        // verdict, let another member of the same human alliance hold it if needed.
         redirectL(MethodTypeInfoValue("com/corrodinggames/rts/gameFramework/y", "a",
             "(Lcom/corrodinggames/rts/gameFramework/j/k;ZZZ)Z", false, HessSurvivalResyncBinding::class.java))
         redirectL(MethodTypeInfoValue("com/corrodinggames/rts/gameFramework/n/f", "c", "(F)V", true,

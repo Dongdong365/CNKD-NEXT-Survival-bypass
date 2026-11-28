@@ -1,201 +1,64 @@
-目前正在尝试通过“脏”步骤——即正常模式中增加 自动重启房间 的开关，让服务端检测到游戏结束但不进行任何操作，从而让生存图运行。
+# CNKD NEXT 生存图服务端补丁
 
-适用于管理员全权看管在游戏结束.battleroom 运行。
+基于 **CNKD NEXT 1.1.24 无头服务端**，解决两个不同的问题：合作生存不应因为同步读档或某一名队友先出局就判整队失败；对局真正结束后，管理员也可以决定什么时候回大厅。这里的修改在服务端，**玩家继续使用原版 Rusted Warfare 客户端，不需要装补丁。**
 
-初步推测是 生存图监测过于严格？ 但我已无力更改:(
+## 相比原端改了什么
 
-更改内容几乎全依靠于ai，我提供口头描述进行修改。~~因为太多我已经看不懂了~~
+### 1. 修正全量同步后的生存判负
 
-这是针对于使用生存图的个性化优化，遵循AGPL开源。每个人有每个人的生存图实现方案，我把我的方案作为即将成功的参考;)
+无头服务端没有参战的房主，用隐藏队伍 `-1` 占位。原端在同步时也会读回存档，读档可能让生存任务去查这个隐藏队伍的总部。`-1` 本来就没有总部，于是真人总部还在，服务端也可能判负。
 
-部分生存图完全可用，一小部分生存图可能因为本身就有bug所以无法用，推荐换图。
+本版在服务端读档后、原生生存任务判负前纠正这个引用。**网络房主仍是 `-1`，改变的只是生存任务去查哪支队伍。** 同步照常发存档、客户端照常重载。这不是取消同步，也不是修复网络掉线。
 
-内测正常，正在准备实测。
+### 2. 合作生存看本阵营，不看某一个槽位
 
-```yml
-{
-  "common": {
-    "defStartCommand": "start",
-    "log": "WARN",
-    "errorLogMaxSizeMb": 8,
-    "errorLogRetainFiles": 3,
-    "cmdTitle": "",
-    "followBetaVersion": false,
-    "port": 5123,
-    "serverName": "CNKD NEXT Start 服",
-    "chatSenderName": "CNKD",
-    "subtitle": "",
-    "autoUpList": false,
-    "listStatusSuffixEnabled": false,
-    "listNamePinnedCharacterCount": 0,
-    "listPinnedCharacterCount": 20,
-    "publicListEntries": [],
-    "listExperimentEnabled": false,
-    "listExperimentGameName": "",
-    "listExperimentCreatedBy": "",
-    "listExperimentMapName": "",
-    "listExperimentGameStatus": "",
-    "listExperimentPlayerCount": -1,
-    "listExperimentMaxPlayerCount": -1,
-    "listPromotionModeEnabled": false,
-    "listPromotionGameStatus": "chat",
-    "listPromotionPlayerCount": -1,
-    "listPromotionMaxPlayerCount": -1,
-    "listPromotionSortBoostEnabled": false,
-    "listPromotionSortBoostPrefix": "𒀱",
-    "listPromotionBlankMapEnabled": false
-  },
-  "network": {
-    "ipCheckMultiLanguageSupport": true,
-    "singleUserRelay": false,
-    "singleUserRelayMod": false,
-    "mixProtocolEnable": false,
-    "rconMixEnable": false,
-    "webMixEnable": false,
-    "rconPort": 0,
-    "rconPasswd": "RW-HPS",
-    "webPort": 0,
-    "webToken": "RW-HPS",
-    "webHOST": "",
-    "sslEnable": false,
-    "sslMixEnable": false,
-    "sslPasswd": "RW-HPS"
-  },
-  "gameplay": {
-    "serverID": "CNKD-NEXT",
-    "enterAd": "欢迎加入本服务器",
-    "startAd": "服务器已就绪！",
-    "maxPlayerJoinAd": "房间已达到管理员设置的人数上限 请稍后再试 @CNKD",
-    "startPlayerJoinAd": "对局正在进行中 请稍后再试 @CNKD",
-    "passwd": "",
-    "maxPlayer": 100,
-    "oneAdmin": true,
-    "startMinPlayerSize": -1,
-    "autoStartMinPlayerSize": -1,
-    "autoStartCountdownSeconds": 5,
-    "manualStartCountdownSeconds": 5,
-    "maxGameIngTime": 7200,
-    "maxOnlyAIGameIngTime": 3600,
-    "enableAI": false,
-    "maxMessageLen": 100,
-    "maxUnit": 1000,
-    "defIncome": 1.0,
-    "defaultStartingCreditsAmount": 4000,
-    "disableNukes": false,
-    "defaultFogMode": "lineOfSight",
-    "isAfk": true,
-    "muteAll": false,
-    "turnStoneIntoGold": false,
-    "modsLoadErrorPrint": false,
-    "saveRePlayFile": true
-  },
-  "lobby": {
-    "disableTeamChange": false,
-    "disablePositionChange": false,
-    "adminCanOverrideTeamRules": true,
-    "adminCanOverridePositionRules": true,
-    "enableFreeForAllMode": false,
-    "enableAlternateTeamsOnJoin": false,
-    "enableSurvivalMapMode": false,
-    "survivalGameOverGraceSeconds": 180,
-    "survivalEnemyClearConfirmSeconds": 45,
-    "enableLobbySyncOptimization": true,
-    "lobbyRefreshHeartbeatMillis": 30000,
-    "lobbyPacketHeartbeatMillis": 30000,
-    "latencyHeartbeatMillis": 1000,
-    "enableLobbyGameSyncPacketFilter": true,
-    "lobbyGameSyncPacketHeartbeatMillis": 3000,
-    "lobbyGameSyncPacketJoinGraceMillis": 180000,
-    "reconnectGraceMillis": 5000,
-    "enableGameOverBattleRoomReturn": false,
-    "gameOverReturnCountdownSeconds": 30,
-    "autoResumeAfterGameOver": true,
-    "pruneDisconnectedPlayersOnGameOver": true,
-    "enableJoinReadinessTips": false,
-    "joinTipModWarningThreshold": 1,
-    "enableIndividualSurrender": false,
-    "enableAutoKickPlayerWhenAllUnitsDestroyed": false,
-    "autoKickPlayerWhenAllUnitsDestroyedMessage": "你已失去全部单位 已被服务器移出本局"
-  },
-  "map": {
-    "enableMapLock": false,
-    "lockMap": "",
-    "enableModPackageMapDiscovery": true,
-    "modPackageMapScanMaxArchiveSizeMb": 512,
-    "enableModPackageMapSupportExtraction": true,
-    "enableModPackageMapAutoExtraction": true,
-    "enableModPackageMapRuntimeGc": true,
-    "modPackageMapRuntimeGcGraceHours": 24,
-    "modPackageMapRuntimeGcMaxDeletePerRun": 20
-  },
-  "ranked": {
-    "coreNodeEnabled": false,
-    "gatewayBaseUrl": "http://127.0.0.1:3010",
-    "queueCode": "ranked_1v1",
-    "pollIntervalSeconds": 2,
-    "jumpDelaySeconds": 1
-  },
-  "advertisingRedirect": {
-    "enabled": false,
-    "targetHost": "101.43.41.22",
-    "targetPort": 5123,
-    "targetRoomId": "",
-    "redirectTiming": "afterJoin",
-    "joinProbeSafeMode": true,
-    "delaySeconds": 2,
-    "showNotice": true,
-    "noticeBeforeRedirect": "欢迎来到 CNKD 导航服 正在为你跳转到主服",
-    "noticeOnManualFallback": "如未自动跳转 请手动加入 {host}:{port}",
-    "kickAfterRedirect": true,
-    "cooldownSecondsPerPlayer": 10,
-    "maxRedirectAttemptsPerConnection": 1,
-    "allowLocalhostTarget": false,
-    "allowPrivateIpTarget": true,
-    "allowedTargetHosts": [],
-    "disableWhenRankedCoreNode": true,
-    "disableWhenRankedShardNode": true,
-    "adminBypass": true,
-    "logRedirect": true
-  },
-  "console": {
-    "verbosity": "normal",
-    "showPlayerJoinLeave": true,
-    "showPlayerChat": false,
-    "showLowLatencySummary": false,
-    "showSurvivalRepair": false,
-    "showRankedCompatibility": false
-  },
-  "pluginLogging": {
-    "consoleLevel": "INFO",
-    "fileLevel": "INFO",
-    "infoLinesPerMinutePerPlugin": 120,
-    "maxMessageLength": 2048,
-    "maxFileSizeMb": 8,
-    "retainDays": 7
-  },
-  "singleRoomLowLatency": {
-    "enabled": true,
-    "metricsEnabled": false,
-    "summaryIntervalSeconds": 30,
-    "fastGameCommand": true,
-    "preTickGameCommandDrain": true,
-    "preTickGameCommandDrainRequiresStartedRoom": true,
-    "preTickGameCommandDrainLimit": 128,
-    "inlineGameCommandProcessing": false,
-    "inlineGameCommandRequiresStartedRoom": true,
-    "skipPlayerOperationEvents": true,
-    "skipPingActionIntercept": true,
-    "disableTurnStoneIntoGoldOnFastPath": true,
-    "serverInjectedCommandLeadTicks": 8,
-    "hessOutboundCommandLeadTicks": 8,
-    "hessFrameInvariantGuardEnabled": true,
-    "headlessFpsOverride": 60,
-    "nettyWorkerThreadsOverride": 1,
-    "directEventLoopWrites": true
+只在**原生生存任务、且开局参战真人属于同一个阵营**时启用。当前用于判定的真人队伍还有总部，就保持原样；如果该队伍失去最后一座总部，而同阵营另一支真人队伍还有总部，就由后者接替。开局名单不会随着玩家短暂掉线重新选阵营。
+
+**只算真人参战队伍的存活总部，同阵营 AI、敌方和观战都不算。** 本阵营最后一座有效总部消失时，仍由引擎按原规则判负。普通 5v5、3v3 玩家对战不走这条规则，也不改变原版客户端的个人判定或地图自定义脚本的其他胜负条件。
+
+### 3. 可以关掉赛后自动收场，改为手动回房
+
+新增 `lobby.autoResumeAfterGameOver`，默认 `true`，保留原端的自动收场行为。设为 `false` 后，服务端不再走自动倒计时、自动回大厅或自动重置并开下一局的流程。房间进入结算时，可以由有权限的管理员用 **`.battleroom`** 手动回到大厅；服务端控制台的 **`gameover`** 仍可手动重置。服务端也不再仅因为房间在结算态就拦下人类玩家的游戏指令。
+
+这个开关还会跳过服务端常规的胜者播报路径，但**不会关闭游戏引擎或地图自己的胜负判定**。它和上面的同步修复是两回事：同步修复按对局条件生效，不需要为了启用它而关掉赛后自动返回。
+
+### 4. 新增两个同步测试命令
+
+不用等随机失步。在隔离测试服的 Java 启动参数中加入 `-Dcnkd.testResync=true`（放在 `-jar` 之前），开局后在**服务端控制台**输入：
+
+| 命令 | 用来测什么 |
+| --- | --- |
+| `testresync` | 直接执行一次全量同步。不会打印自动失步检查的 `Resyncing game for ...`。 |
+| `testresync auto` | 模拟一次满足条件的失步，让引擎走自动全量同步分支并自行打印 `Resyncing game for ...`。不是切换到持续自动模式。 |
+
+两条命令默认关闭。正式服不需要这个参数，也不用改客户端。
+
+## 开服和配置
+
+- 按[构建说明](BUILDING-CN.md)准备与服务端版本匹配的引擎资源并构建新 JAR。Windows 可在仓库根目录运行：
+
+  ```powershell
+  .\gradlew.bat :Server-All:jar
+  ```
+
+- 如果想手动收场，只合并或修改服端 `data/ServerConfig.json` 的 `lobby` 下这一项，保留现有的其它配置：
+
+  ```json
+  {
+    "lobby": {
+      "autoResumeAfterGameOver": false
+    }
   }
-}
-```
+  ```
 
-ServerConfig.json:97 → lobby 段的 "autoResumeAfterGameOver": true
+- 完整配置请查[服务端默认值模板](runtime-data/ServerConfig.默认值.json)、[房间权限模板](runtime-data/RoomPermissionConfig.默认值.json)和[配置说明](runtime-data/CONFIG-HELP-CN.txt)。仓库还增加了 [GitHub Actions 打包流程](.github/workflows/build.yml)，用来生成 JAR，不替代联机测试。
 
-改为false直接飞掉游戏结束后自动重置/返回、让房间停在结算态,等房主 .battleroom 逃生
+## 验证到哪一步
+
+已用参考引擎验证：隐藏房主引用能修正、队友有总部时能接替、只剩敌方总部时仍判负；也验证了两种测试命令的路由。原始第三方生存图的多人联机结果尚未确认。**看到同步日志只说明开始同步，重载后能继续原局才是验收。**
+
+## 文档与来源
+
+- [维护交接](交接文档.md)：修改索引、配置、赛后结算和手动回房的代码位置。
+- [全量同步与合作生存交接](交接文档-resync地图误判全员退出.md)：引擎挂点、阵营判定、日志和复测步骤。
+- [原端版本与来源](SOURCE-ORIGIN.json) · [AGPL-3.0 许可证](LICENSE)

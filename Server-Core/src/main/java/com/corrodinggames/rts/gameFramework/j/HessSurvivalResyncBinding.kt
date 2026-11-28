@@ -11,28 +11,42 @@ import com.corrodinggames.rts.game.units.d.e as CommandCenter
 import com.corrodinggames.rts.gameFramework.l
 import com.corrodinggames.rts.gameFramework.n.f as Mission
 import net.rwhps.asm.api.listener.RedirectionListener
-import java.util.Collections
-import java.util.IdentityHashMap
+import net.rwhps.server.game.room.SurvivalHumanRoster
+import net.rwhps.server.plugin.internal.headless.inject.core.GameEngine
 
-/**
- * The headless host is n.i (slot -1). The network save loader assigns l.bs from ad.z,
- * so a resync can leave the native survival check looking for an HQ on that hidden team.
- * Rebind only the simulation-side reference; ad.z must remain the hidden network host.
- */
+/** The single-player survival rule expects l.bs to own a live HQ. In a cooperative
+ * headless match, keep that reference on a surviving member of the starting human alliance. */
 internal object HessSurvivalResyncBinding : RedirectionListener {
+    private const val NATIVE_VERDICT_INTERVAL_MS = 1_000
+    private val lastNativeVerdictAt by lazy {
+        Mission::class.java.getDeclaredField("c").apply { isAccessible = true }
+    }
+
     override fun invoke(obj: Any, desc: String, vararg args: Any?) {
         try {
             val engine = l.B() ?: return
             val mission = engine.ce ?: return
+            if (!mission.k) return
             val afterLoad = obj === engine.ca
             if (obj !== mission) {
-                // y.a(k, true, true, true) completes both full and quick resync loads.
-                // Its single success return is where the save-loader listener runs.
+                // The successful return of y.a(k, true, true, true) is shared by full
+                // and quick resync. Do not retarget a normal saved-game load here.
                 if (!afterLoad || args.size != 4 || args[1] != true || args[2] != true || args[3] != true) return
+            } else if (engine.bs !== n.i && engine.by <= lastNativeVerdictAt.getInt(mission) + NATIVE_VERDICT_INTERVAL_MS) {
+                // The verdict is periodic. Don't walk every unit every frame after binding.
+                return
             }
-            val slot = restore(engine, mission) ?: return
+            val room = GameEngine.statisticsModuleOrNull?.room ?: return
+            if (!room.isStartGame) return
+            val roster = room.startingSurvivalHumans ?: return
+            val previous = engine.bs
+            val slot = restore(engine, mission, roster) ?: return
             val phase = if (afterLoad) "after resync" else "before mission update"
-            l.b("Headless", "Restored survival team binding $phase: slot=$slot")
+            if (previous === n.i) {
+                l.b("Headless", "Restored survival team binding $phase: slot=$slot")
+            } else {
+                l.b("Headless", "Reassigned survival team binding $phase: slot=${previous?.k} -> $slot")
+            }
         } catch (error: Exception) {
             l.b("Headless", "Unable to restore survival team binding: ${error.javaClass.simpleName}")
         } catch (error: LinkageError) {
@@ -40,35 +54,34 @@ internal object HessSurvivalResyncBinding : RedirectionListener {
         }
     }
 
-    internal fun restore(engine: l, mission: Mission): Int? {
-        if (!mission.k || engine.bs !== n.i) return null
+    internal fun restore(engine: l, mission: Mission, roster: SurvivalHumanRoster): Int? {
+        if (!mission.k) return null
         val net = engine.bX ?: return null
         if (!net.B || !net.C || !net.aW || net.z !== n.i) return null
 
-        // Use the actual authenticated engine connections, not placeholder teams or just a count
-        // of nonempty slots. A disconnected slot is not made online by the resync repair.
-        val connected = Collections.newSetFromMap(IdentityHashMap<n, Boolean>())
-        for (entry in net.aM) {
-            val connection = entry as? c ?: continue
-            if (!connection.p || connection.a || connection.b) continue
-            val team = connection.z ?: continue
-            if (team.k >= 0 && !team.w && !team.b() && !team.E && !team.F && !team.G && n.k(team.k) === team) {
-                connected.add(team)
-            }
-        }
-        if (connected.isEmpty()) return null
-
-        // Match the native survival predicate in Mission.c(float): live command center or
-        // a custom HQ (bP), whose owner is the exact team object, not just the same alliance.
-        var boundTeam: n? = null
+        val current = engine.bs
+        var replacement: n? = null
         for (entry in am.bE) {
             val unit = entry as? am ?: continue
-            if (unit !is CommandCenter && !unit.bP || unit.bV || unit.u()) continue
+            // Match the original survival verdict's HQ and alive predicates.
+            if ((unit !is CommandCenter && !unit.bP) || unit.bV || unit.u()) continue
             val owner = unit.bX ?: continue
-            if (owner in connected && (boundTeam == null || owner.k < boundTeam.k)) boundTeam = owner
+            if (!isParticipant(owner, roster) || owner.E || owner.F || owner.G) continue
+            // Keep a still-valid binding even when a lower-numbered teammate also has an HQ.
+            if (owner === current) return null
+            if (replacement == null || owner.k < replacement.k) replacement = owner
         }
-        val team = boundTeam ?: return null
+
+        val team = replacement ?: run {
+            // No qualifying member: never let an unrelated team keep this mission alive.
+            // An existing participant is left to the native defeat path.
+            if (current != null && current !== n.i && !isParticipant(current, roster)) engine.bs = n.i
+            return null
+        }
         engine.bs = team
         return team.k
     }
+
+    private fun isParticipant(team: n, roster: SurvivalHumanRoster): Boolean =
+        roster.contains(team.k, team.r) && !team.w && !team.b() && n.k(team.k) === team
 }
