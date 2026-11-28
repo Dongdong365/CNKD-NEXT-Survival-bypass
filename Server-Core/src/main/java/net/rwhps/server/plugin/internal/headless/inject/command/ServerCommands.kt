@@ -18,6 +18,7 @@ import net.rwhps.server.game.event.game.PlayerBanEvent
 import net.rwhps.server.game.event.game.PlayerIpBanEvent
 import net.rwhps.server.game.event.game.PlayerIpUnBanEvent
 import net.rwhps.server.game.event.game.PlayerUnBanEvent
+import net.rwhps.server.game.headless.core.link.FullGameSyncLink
 import net.rwhps.server.game.manage.HeadlessModuleManage
 import net.rwhps.server.game.manage.MapManage
 import net.rwhps.server.game.manage.ModCompatibilitySupport
@@ -582,6 +583,7 @@ internal class ServerCommands(handler: CommandHandler) {
     }
 
     init {
+        TestResyncConsoleCommand.register(handler) { gameModule.gameLinkFunction as? FullGameSyncLink }
         registerPlayerCommand(handler)
         registerPlayerStatusCommand(handler)
         registerPlayerCustomEx(handler)
