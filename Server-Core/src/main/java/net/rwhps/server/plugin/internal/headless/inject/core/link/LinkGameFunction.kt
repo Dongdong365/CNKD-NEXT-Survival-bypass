@@ -8,6 +8,7 @@
 package net.rwhps.server.plugin.internal.headless.inject.core.link
 
 import com.corrodinggames.rts.game.n
+import com.corrodinggames.rts.gameFramework.j.HessAutoResyncTest
 import com.corrodinggames.rts.gameFramework.j.c
 import net.rwhps.server.game.headless.core.link.AbstractLinkGameFunction
 import net.rwhps.server.game.headless.core.link.BattleRoomLobbyRecoveryLink
@@ -135,7 +136,13 @@ internal class LinkGameFunction: net.rwhps.server.game.headless.core.link.Checke
 
     override fun syncFullGameState(): FullGameSyncResult = syncFullGameStateForGeneration(GameEngine.data.room.lobbyLifecycleGeneration())
 
-    override fun syncFullGameStateForGeneration(expectedGeneration: Long): FullGameSyncResult {
+    override fun syncFullGameStateForGeneration(expectedGeneration: Long): FullGameSyncResult =
+        dispatchFullGameSync(expectedGeneration, simulateDesync = false)
+
+    override fun testAutoResync(): FullGameSyncResult =
+        dispatchFullGameSync(GameEngine.data.room.lobbyLifecycleGeneration(), simulateDesync = true)
+
+    private fun dispatchFullGameSync(expectedGeneration: Long, simulateDesync: Boolean): FullGameSyncResult {
         val generation = expectedGeneration
         if (GameEngine.data.room.lobbyLifecycleGeneration() != generation) {
             return FullGameSyncResult(false, IllegalStateException("full_game_sync_match_changed"))
@@ -152,7 +159,7 @@ internal class LinkGameFunction: net.rwhps.server.game.headless.core.link.Checke
             operationSucceeded = GameEngine.data.gameFunction.suspendMainThreadOperations {
                 syncError = if (GameEngine.data.room.lobbyLifecycleGeneration() != generation) {
                     IllegalStateException("full_game_sync_match_changed")
-                } else fullGameSyncOnGameThread()
+                } else fullGameSyncOnGameThread(simulateDesync)
             }
         } finally {
             engineSyncInProgress.set(false)
@@ -326,7 +333,7 @@ internal class LinkGameFunction: net.rwhps.server.game.headless.core.link.Checke
         }
     }
 
-    private fun fullGameSyncOnGameThread(): Throwable? {
+    private fun fullGameSyncOnGameThread(simulateDesync: Boolean): Throwable? {
         if (!isFullGameSyncReady()) {
             return IllegalStateException(FULL_GAME_SYNC_REQUIRES_STARTED_ROOM)
         }
@@ -334,10 +341,13 @@ internal class LinkGameFunction: net.rwhps.server.game.headless.core.link.Checke
             val engine = GameEngine.gameEngine
             synchronized(engine) {
                 val mapEngine = engine.bL
-                if (mapEngine == null || !mapEngine.W || engine.bX == null || engine.bX.ay == null) {
+                val netEngine = engine.bX
+                if (mapEngine == null || !mapEngine.W || netEngine == null || netEngine.ay == null) {
                     mapEngineNotReadyError()
+                } else if (simulateDesync) {
+                    HessAutoResyncTest.forceOnce(netEngine)
                 } else {
-                    engine.bX.a(false, false, true)
+                    netEngine.a(false, false, true)
                     null
                 }
             }
