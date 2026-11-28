@@ -10,6 +10,7 @@
 package net.rwhps.server.dependent
 
 import net.rwhps.asm.agent.AsmAgent
+import net.rwhps.server.dependent.redirections.game.CooperativeSurvivalVerdictTransformer
 import net.rwhps.server.dependent.redirections.game.GameMainRedirections
 import net.rwhps.server.dependent.redirections.lwjgl.LwjglRedirections
 import net.rwhps.server.dependent.redirections.slick.SlickRedirections
@@ -39,5 +40,6 @@ class HeadlessProxyClass: AgentAttachData() {
 
 
         AsmAgent.agentmain(this.instrumentation)
+        this.instrumentation.addTransformer(CooperativeSurvivalVerdictTransformer)
     }
 }

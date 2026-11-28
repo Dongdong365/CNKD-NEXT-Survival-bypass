@@ -10,6 +10,7 @@ package net.rwhps.server.plugin.internal.headless.support
 import com.corrodinggames.rts.game.n
 import com.corrodinggames.rts.gameFramework.l as GameCore
 import net.rwhps.server.data.global.Data
+import net.rwhps.server.dependent.redirections.game.CooperativeSurvivalVerdictTransformer
 import net.rwhps.server.game.event.game.ServerGameOverEvent.GameOverData
 import net.rwhps.server.game.manage.HeadlessModuleManage
 import net.rwhps.server.game.player.PlayerHess
@@ -279,7 +280,12 @@ internal object StartModeSurvivalSupport {
             val humanMainBuildings = localPlayer.humanMainBuildings
             val primaryHumanMainBuildings = StartModeSurvivalRuntimeQuerySupport.countMainBuildingsForPlayerIndex(layout.primaryHumanSlot.playerIndex)
 
-            if (missionSurvival && ended && shouldKeepSurvivalMissionRunning(humanMainBuildings, layout.profile)) {
+            if (missionSurvival && ended &&
+                // A native cooperative defeat now means no human units remain. The older HQ
+                // recovery policy must not clear this result (even on winCondition=none maps).
+                !(usesNativeCooperativeBinding(engine, room) && CooperativeSurvivalVerdictTransformer.isPatched(mission.javaClass)) &&
+                shouldKeepSurvivalMissionRunning(humanMainBuildings, layout.profile)
+            ) {
                 StartModeSurvivalMissionAccessSupport.setBooleanField(mission, "m", false)
                 ended = false
                 missionDefeatStateRepairs.incrementAndGet()

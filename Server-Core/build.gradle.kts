@@ -17,6 +17,8 @@ dependencies {
 
     implementation(project(":TimeTaskQuartz"))
     implementation(project(":ASM-Framework"))
+    compileOnlyAndTest("org.ow2.asm:asm:9.7")
+    compileOnlyAndTest("org.ow2.asm:asm-tree:9.7")
 
     //implementation("com.github.minxyzgo.rw-injection:core:077d92e08c")
     //compileOnly("com.github.minxyzgo.rw-injection:source:master-SNAPSHOT")
