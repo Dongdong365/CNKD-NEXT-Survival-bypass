@@ -202,7 +202,11 @@ class CallManage(private val gameModule: AbstractGameModule) {
             }
 
 
-            if (StartModeGameOverReturnSupport.isPlaying() && gameModule.room.flagData.sendGameStatusFlag) {
+            if (
+                StartModeGameOverReturnSupport.isPlaying() &&
+                StartModeGameOverReturnSupport.autoResumeEnabled() &&
+                gameModule.room.flagData.sendGameStatusFlag
+            ) {
                 if (StartModeSurvivalSupport.shouldSkipGenericVerdictProbe(gameModule.room)) {
                     return@newTimedTask
                 }
