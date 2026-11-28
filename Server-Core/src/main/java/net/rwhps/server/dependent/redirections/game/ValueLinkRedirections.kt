@@ -9,6 +9,7 @@
 
 package net.rwhps.server.dependent.redirections.game
 
+import com.corrodinggames.rts.gameFramework.j.HessSurvivalResyncBinding
 import net.rwhps.asm.data.MethodTypeInfoValue
 import net.rwhps.server.dependent.redirections.MainRedirections
 import net.rwhps.server.dependent.redirections.game.clas.CompatibleThreadUnsafeArrayList
@@ -36,6 +37,14 @@ class ValueLinkRedirections: MainRedirections {
         // With Game Tick Injection Packet, For thread safety
         @GameSimulationLayer.GameSimulationLayer_KeyWords("Returning to battleroom in")
         redirectL(MethodTypeInfoValue("com/corrodinggames/rts/gameFramework/j/ad", "a", "(F)V", true, CompatibleThreadUnsafeArrayList::class.java))
+
+        // Headless survival checks consume l.bs, which the network save loader resets to the
+        // hidden host (ad.z). Fix it on successful resync, and before the first mission tick
+        // so a false defeat cannot be included in the snapshot in the first place.
+        redirectL(MethodTypeInfoValue("com/corrodinggames/rts/gameFramework/y", "a",
+            "(Lcom/corrodinggames/rts/gameFramework/j/k;ZZZ)Z", false, HessSurvivalResyncBinding::class.java))
+        redirectL(MethodTypeInfoValue("com/corrodinggames/rts/gameFramework/n/f", "c", "(F)V", true,
+            HessSurvivalResyncBinding::class.java))
 
         /*
          * BL-NULL (task-45): close the render gate `bG` at the ENTRY of `game.i.f()V`.

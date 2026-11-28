@@ -23,6 +23,18 @@ import org.junit.jupiter.api.Test
 
 internal class GameThreadDispatchWiringTest {
     @Test
+    fun survivalBindingRunsAtTheNativeResyncAndMissionBoundaries() {
+        val registrations = javaClass.getResourceAsStream(
+            "/net/rwhps/server/dependent/redirections/game/ValueLinkRedirections.class"
+        )?.use { it.readBytes().toString(Charsets.ISO_8859_1) }
+            ?: error("ValueLinkRedirections class bytes are unavailable")
+
+        assertTrue(registrations.contains("com/corrodinggames/rts/gameFramework/j/HessSurvivalResyncBinding"))
+        assertTrue(registrations.contains("com/corrodinggames/rts/gameFramework/y"))
+        assertTrue(registrations.contains("(Lcom/corrodinggames/rts/gameFramework/j/k;ZZZ)Z"))
+        assertTrue(registrations.contains("com/corrodinggames/rts/gameFramework/n/f"))
+    }
+    @Test
     fun injectedGameFunctionUsesTheConcurrentUpdateQueueInsteadOfTheSlickPauseFlag() {
         val constantPoolText = GameFunction::class.java
             .getResourceAsStream("/${GameFunction::class.java.name.replace('.', '/')}.class")
